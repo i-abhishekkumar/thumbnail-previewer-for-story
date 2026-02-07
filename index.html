@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YouTube Thumbnail Previewer & Downloader</title>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <style>
+      :root {
+        --yt-bg: #0f0f0f;
+        --yt-text: #f1f1f1;
+        --yt-meta: #aaaaaa;
+        --yt-font: "Roboto", Arial, sans-serif;
+        --yt-card-width: 380px; /* Slightly wider for HD feel */
+      }
+
+      body {
+        background-color: #1e1e1e;
+        font-family: var(--yt-font);
+        margin: 0;
+        padding: 20px;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      h1 {
+        margin-bottom: 20px;
+      }
+
+      .container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 40px;
+        max-width: 1200px;
+        width: 100%;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      /* --- Controls Section --- */
+      .controls {
+        background: #2b2b2b;
+        padding: 20px;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      }
+
+      .input-group {
+        margin-bottom: 15px;
+      }
+
+      label {
+        display: block;
+        font-size: 12px;
+        color: #ccc;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+
+      input[type="text"],
+      input[type="file"] {
+        width: 100%;
+        padding: 10px;
+        background: #3d3d3d;
+        border: 1px solid #555;
+        color: white;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+
+      .row {
+        display: flex;
+        gap: 10px;
+      }
+
+      .divider {
+        height: 1px;
+        background: #555;
+        margin: 20px 0;
+      }
+
+      .btn {
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 20px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 14px;
+        margin-top: 5px;
+        transition: 0.2s;
+      }
+
+      .btn-primary {
+        background-color: #3ea6ff;
+        color: black;
+      }
+      .btn-primary:hover {
+        background-color: #65b8ff;
+      }
+
+      .btn-success {
+        background-color: #2ba640;
+        color: white;
+        margin-top: 20px;
+      }
+      .btn-success:hover {
+        background-color: #3bc753;
+      }
+
+      /* --- Preview Area --- */
+      .preview-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+      }
+
+      /* The Card to Capture */
+      .yt-card {
+        width: var(--yt-card-width);
+        background-color: #0f0f0f; /* Match YT Background */
+        padding: 10px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-family: "Roboto", Arial, sans-serif;
+        /* Ensure High Quality Rendering */
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .thumbnail-container {
+        position: relative;
+        width: 100%;
+        padding-top: 56.25%; /* 16:9 */
+        border-radius: 12px;
+        overflow: hidden;
+        background: #000;
+      }
+
+      .thumbnail-img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .duration-badge {
+        position: absolute;
+        bottom: 6px;
+        right: 6px;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .meta-data {
+        display: flex;
+        margin-top: 12px;
+        padding-right: 10px;
+      }
+
+      .channel-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background-color: #333;
+        margin-right: 12px;
+        flex-shrink: 0;
+        background-image: url("https://cdn-icons-png.flaticon.com/512/149/149071.png");
+        background-size: cover;
+        background-position: center;
+      }
+
+      .text-info {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .video-title {
+        color: var(--yt-text);
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.4rem;
+        margin-bottom: 6px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+
+      .channel-name,
+      .video-stats {
+        color: var(--yt-meta);
+        font-size: 14px;
+        line-height: 1.2rem;
+      }
+
+      .video-stats {
+        display: flex;
+        gap: 4px;
+      }
+
+      .dot::before {
+        content: "•";
+        margin: 0 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>YouTube Thumbnail Builder</h1>
+
+    <div class="container">
+      <div class="controls">
+        <div class="input-group">
+          <label style="color: #3ea6ff"
+            >Step 1: Paste Link & Fetch (Optional)</label
+          >
+          <input
+            type="text"
+            id="ytLinkInput"
+            placeholder="https://www.youtube.com/watch?v=..."
+          />
+          <button class="btn btn-primary" onclick="fetchFromLink()">
+            Fetch Data & Thumbnail
+          </button>
+        </div>
+
+        <div class="divider"></div>
+
+        <h3>Customize Details</h3>
+
+        <div class="row">
+          <div class="input-group" style="flex: 1">
+            <label>Thumbnail Image</label>
+            <input type="file" id="fileInput" accept="image/*" />
+          </div>
+          <div class="input-group" style="flex: 1">
+            <label>Channel Icon (Profile)</label>
+            <input type="file" id="profileInput" accept="image/*" />
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label>Video Title</label>
+          <input
+            type="text"
+            id="titleInput"
+            value="Video Title Here"
+            oninput="updatePreview()"
+          />
+        </div>
+
+        <div class="input-group">
+          <label>Channel Name</label>
+          <input
+            type="text"
+            id="channelInput"
+            value="Channel Name"
+            oninput="updatePreview()"
+          />
+        </div>
+
+        <div class="row">
+          <div class="input-group">
+            <label>Duration</label>
+            <input
+              type="text"
+              id="timeInput"
+              value="10:00"
+              oninput="updatePreview()"
+            />
+          </div>
+          <div class="input-group">
+            <label>Views</label>
+            <input
+              type="text"
+              id="viewsInput"
+              value="1M views"
+              oninput="updatePreview()"
+            />
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label>Upload Date</label>
+          <input
+            type="text"
+            id="dateInput"
+            value="2 days ago"
+            oninput="updatePreview()"
+          />
+        </div>
+
+        <div class="divider"></div>
+
+        <button class="btn btn-success" onclick="downloadPreview()">
+          Download HD Preview
+        </button>
+      </div>
+
+      <div class="preview-area">
+        <div style="color: #888; font-size: 0.9em">
+          Preview (This is what downloads)
+        </div>
+
+        <div class="yt-card" id="captureArea">
+          <div class="thumbnail-container">
+            <img
+              src="https://via.placeholder.com/1280x720/000000/333333?text=Thumbnail"
+              class="thumbnail-img"
+              id="previewImg"
+              crossorigin="anonymous"
+            />
+            <div class="duration-badge" id="previewDuration">10:00</div>
+          </div>
+
+          <div class="meta-data">
+            <div class="channel-icon" id="previewProfile"></div>
+            <div class="text-info">
+              <div class="video-title" id="previewTitle">Video Title Here</div>
+              <div class="channel-name" id="previewChannel">Channel Name</div>
+              <div class="video-stats">
+                <span id="previewViews">1M views</span>
+                <span class="dot" id="previewDate">2 days ago</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- 1. Real-time Text Updates ---
+      function updatePreview() {
+        document.getElementById("previewTitle").innerText =
+          document.getElementById("titleInput").value;
+        document.getElementById("previewChannel").innerText =
+          document.getElementById("channelInput").value;
+        document.getElementById("previewDuration").innerText =
+          document.getElementById("timeInput").value;
+        document.getElementById("previewViews").innerText =
+          document.getElementById("viewsInput").value;
+        document.getElementById("previewDate").innerText =
+          document.getElementById("dateInput").value;
+      }
+
+      // --- 2. Image Handling (Thumbnail & Profile) ---
+      const fileInput = document.getElementById("fileInput");
+      const profileInput = document.getElementById("profileInput");
+      const previewImg = document.getElementById("previewImg");
+      const previewProfile = document.getElementById("previewProfile");
+
+      // Thumbnail Upload
+      fileInput.addEventListener("change", (e) =>
+        handleImageUpload(e, (url) => (previewImg.src = url)),
+      );
+
+      // Profile Upload
+      profileInput.addEventListener("change", (e) =>
+        handleImageUpload(
+          e,
+          (url) => (previewProfile.style.backgroundImage = `url('${url}')`),
+        ),
+      );
+
+      function handleImageUpload(event, callback) {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => callback(e.target.result);
+          reader.readAsDataURL(file);
+        }
+      }
+
+      // --- 3. Auto Fetch from Link ---
+      async function fetchFromLink() {
+        const url = document.getElementById("ytLinkInput").value;
+        const videoId = extractVideoID(url);
+
+        if (!videoId) {
+          alert("Invalid YouTube URL");
+          return;
+        }
+
+        // A. Set Thumbnail (High Res)
+        const maxResUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        // We set the input to match the image so the user knows
+        previewImg.src = maxResUrl;
+
+        // B. Fetch Title & Channel Name via 'NoEmbed' (Public Proxy)
+        // Note: YouTube main API requires a key. NoEmbed is a free wrapper.
+        try {
+          const response = await fetch(
+            `https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`,
+          );
+          const data = await response.json();
+
+          if (data.title) {
+            document.getElementById("titleInput").value = data.title;
+            document.getElementById("previewTitle").innerText = data.title;
+          }
+          if (data.author_name) {
+            document.getElementById("channelInput").value = data.author_name;
+            document.getElementById("previewChannel").innerText =
+              data.author_name;
+          }
+          // Note: Profile Picture URL is not available in NoEmbed response.
+          // It must be uploaded manually.
+        } catch (error) {
+          console.log("Could not auto-fetch text details.", error);
+        }
+      }
+
+      function extractVideoID(url) {
+        const regExp =
+          /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+        const match = url.match(regExp);
+        return match && match[7].length == 11 ? match[7] : false;
+      }
+
+      // --- 4. Download Function ---
+      function downloadPreview() {
+        const captureElement = document.getElementById("captureArea");
+
+        // Use html2canvas to take a screenshot of the div
+        html2canvas(captureElement, {
+          useCORS: true, // Important for fetching YouTube images
+          backgroundColor: "#0f0f0f", // Ensure background is captured
+          scale: 2, // High resolution (Retina)
+        }).then((canvas) => {
+          // Create a fake link to trigger download
+          const link = document.createElement("a");
+          link.download = "youtube-preview.png";
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+        });
+      }
+    </script>
+  </body>
+</html>
